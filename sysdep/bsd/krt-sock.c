@@ -1072,6 +1072,22 @@ kif_sys_shutdown(struct kif_proto *p)
   krt_buffer_release(&p->p);
 }
 
+int
+kif_sys_reconfigure(struct kif_proto *p UNUSED,
+	struct kif_config *n UNUSED, struct kif_config *o UNUSED)
+{
+  return 1;
+}
+
+void
+kif_sys_init_config(struct kif_config *cf UNUSED)
+{
+}
+
+void
+kif_sys_copy_config(struct kif_config *d UNUSED, struct kif_config *s UNUSED)
+{
+}
 
 struct ifa *
 kif_get_primary_ip(struct iface *i UNUSED6)

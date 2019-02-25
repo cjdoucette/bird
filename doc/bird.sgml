@@ -2411,6 +2411,13 @@ interfaces to be defined for them to work with.
 
 	In all cases, an address marked by operating system as secondary cannot
 	be chosen as the primary one.
+
+	<tag><label id="device-port">port <m/number/</tag> (Linux)
+	Instead of scanning network interfaces via the kernel, interact
+	with a userspace process listening on a Netlink socket identified by
+	the given port ID. The value used should match a process listening on
+	a Netlink socket bound to the same port number. By default, this
+	value is 0, meaning that scan requests are sent to the kernel.
 </descrip>
 
 <p>As the Device protocol doesn't generate any routes, it cannot have
