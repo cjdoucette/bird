@@ -2569,6 +2569,13 @@ limitations can be overcome using another routing table and the pipe protocol.
 	allows to specify a limit on maximal number of nexthops in one route. By
 	default, multipath merging is disabled. If enabled, default value of the
 	limit is 16.
+
+	<tag><label id="krt-port">port <m/number/</tag> (Linux)
+	Instead of scanning and sending route updates to the kernel, interact
+	with a userspace process listening on a Netlink socket identified by
+	the given port ID. The value used should match a process listening on
+	a Netlink socket bound to the same port number. By default, this
+	value is 0, meaning that scan requests are sent to the kernel.
 </descrip>
 
 <sect1>Attributes
