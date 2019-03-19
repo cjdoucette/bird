@@ -1,0 +1,4 @@
+gatekeeper-bird: binary-without-manpage usr/sbin/bird
+gatekeeper-bird: binary-without-manpage usr/sbin/birdc
+gatekeeper-bird: transitional-package-should-be-oldlibs-optional net/optional
+gatekeeper-bird: missing-dependency-on-libc needed by usr/sbin/bird and 1 others

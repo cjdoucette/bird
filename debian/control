@@ -1,0 +1,31 @@
+Source: gatekeeper-bird
+Section: net
+Priority: optional
+Build-Depends: debhelper (>= 9.20160709),
+               dh-exec,
+               autoconf,
+               flex,
+               bison,
+               libncurses5-dev,
+               libreadline-dev
+Maintainer: Andre Nathan <andre@digirati.com.br>
+Standards-Version: 4.1.4
+Vcs-Browser: https://github.com/cjdoucette/bird
+Vcs-Git: https://github.com/cjdoucette/bird.git
+
+Package: gatekeeper-bird
+Architecture: linux-any
+Depends: adduser,
+         ucf,
+         ${misc:Depends},
+         ${shlib:Depends}
+Conflicts: routed,
+           zebra,
+           bird
+Description: Internet Routing Daemon
+ BIRD is an Internet routing daemon with full support for all the major
+ routing protocols. It allows redistribution between protocols with a
+ powerful route filtering syntax and an easy-to-use configuration
+ interface.
+ .
+ This package is patched to work with Gatekeeper.

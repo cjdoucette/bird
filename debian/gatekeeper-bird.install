@@ -1,0 +1,8 @@
+#!/usr/bin/dh-exec --with=install
+
+bird.conf /usr/share/doc/bird/examples/
+bird /usr/sbin/
+birdc /usr/sbin/
+debian/bird.conf /etc/bird/
+debian/prepare-environment /usr/lib/bird/
+debian/gatekeeper-bird-envvars => /etc/bird/envvars
