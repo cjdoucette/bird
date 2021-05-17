@@ -28,6 +28,11 @@ kern_sys_item:
  | PORT expr { THIS_KRT->sys.nl_pid = $2; }
  ;
 
+kif_proto: kif_proto kif_sys_item ';' ;
+
+kif_sys_item: PORT expr { THIS_KIF->sys.nl_pid = $2; }
+ ;
+
 dynamic_attr: KRT_PREFSRC	{ $$ = f_new_dynamic_attr(EAF_TYPE_IP_ADDRESS, T_IP, EA_KRT_PREFSRC); } ;
 dynamic_attr: KRT_REALM	{ $$ = f_new_dynamic_attr(EAF_TYPE_INT, T_INT, EA_KRT_REALM); } ;
 dynamic_attr: KRT_SCOPE	{ $$ = f_new_dynamic_attr(EAF_TYPE_INT, T_INT, EA_KRT_SCOPE); } ;
