@@ -69,7 +69,10 @@
 #define RTA_ENCAP  22
 #endif
 
+#define NL_PID_KERNEL 0
+
 #define krt_ipv4(p) ((p)->af == AF_INET)
+
 #define krt_ecmp6(p) ((p)->af == AF_INET6)
 
 const int rt_default_ecmp = 16;
@@ -128,6 +131,7 @@ struct nl_sock
   byte *rx_buffer;			/* Receive buffer */
   struct nlmsghdr *last_hdr;		/* Recently received packet */
   uint last_size;
+  uint pid;				/* Netlink port ID for replies */
 };
 
 #define NL_RX_SIZE 8192
@@ -147,6 +151,9 @@ nl_open_sock(struct nl_sock *nl)
 {
   if (nl->fd < 0)
     {
+      struct sockaddr_nl sa;
+      socklen_t addr_len;
+
       nl->fd = socket(PF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
       if (nl->fd < 0)
 	die("Unable to open rtnetlink socket: %m");
@@ -154,6 +161,24 @@ nl_open_sock(struct nl_sock *nl)
       nl->rx_buffer = xmalloc(NL_RX_SIZE);
       nl->last_hdr = NULL;
       nl->last_size = 0;
+
+      /* Get the kernel-assigned port ID of our Netlink socket */
+      bzero(&sa, sizeof(sa));
+      sa.nl_family = AF_NETLINK;
+      sa.nl_groups = 0;
+      sa.nl_pid = 0;
+      if (bind(nl->fd, (struct sockaddr *)&sa, sizeof(sa)) < 0)
+        {
+          die("Unable to bind rtnetlink socket: %m");
+          close(nl->fd);
+          nl->fd = -1;
+          return;
+        }
+
+      addr_len = sizeof(sa);
+      if (getsockname(nl->fd, (struct sockaddr *)&sa, &addr_len))
+        die("Unable to get rtnetlink socket port: %m");
+      nl->pid = sa.nl_pid;
     }
 }
 
@@ -165,13 +190,16 @@ nl_open(void)
 }
 
 static void
-nl_send(struct nl_sock *nl, struct nlmsghdr *nh)
+nl_send(struct nl_sock *nl, struct nlmsghdr *nh, u32 nl_pid)
 {
   struct sockaddr_nl sa;
 
   memset(&sa, 0, sizeof(sa));
   sa.nl_family = AF_NETLINK;
-  nh->nlmsg_pid = 0;
+  /* Port to send to */
+  sa.nl_pid = nl_pid;
+  /* Our port ID */
+  nh->nlmsg_pid = nl->pid;
   nh->nlmsg_seq = ++(nl->seq);
   nh->nlmsg_len = NLMSG_ALIGN(nh->nlmsg_len);
   if (sendto(nl->fd, nh, nh->nlmsg_len, 0, (struct sockaddr *)&sa, sizeof(sa)) < 0)
@@ -180,7 +208,7 @@ nl_send(struct nl_sock *nl, struct nlmsghdr *nh)
 }
 
 static void
-nl_request_dump(int af, int cmd)
+nl_request_dump(int af, int cmd, u32 nl_pid)
 {
   struct {
     struct nlmsghdr nh;
@@ -191,7 +219,7 @@ nl_request_dump(int af, int cmd)
     .nh.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP,
     .g.rtgen_family = af
   };
-  nl_send(&nl_scan, &req.nh);
+  nl_send(&nl_scan, &req.nh, nl_pid);
 }
 
 static struct nlmsghdr *
@@ -215,7 +243,6 @@ nl_get_reply(struct nl_sock *nl)
 	  if (sa.nl_pid)		/* It isn't from the kernel */
 	    {
 	      DBG("Non-kernel packet\n");
-	      continue;
 	    }
 	  nl->last_size = x;
 	  nl->last_hdr = (void *) nl->rx_buffer;
@@ -276,11 +303,11 @@ nl_get_scan(void)
 }
 
 static int
-nl_exchange(struct nlmsghdr *pkt, int ignore_esrch)
+nl_exchange(struct nlmsghdr *pkt, int ignore_esrch, u32 nl_pid)
 {
   struct nlmsghdr *h;
 
-  nl_send(&nl_req, pkt);
+  nl_send(&nl_req, pkt, nl_pid);
   for(;;)
     {
       h = nl_get_reply(&nl_req);
@@ -1139,7 +1166,7 @@ kif_do_scan(struct kif_proto *p UNUSED)
 
   if_start_update();
 
-  nl_request_dump(AF_UNSPEC, RTM_GETLINK);
+  nl_request_dump(AF_UNSPEC, RTM_GETLINK, NL_PID_KERNEL);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWLINK || h->nlmsg_type == RTM_DELLINK)
       nl_parse_link(h, 1);
@@ -1166,14 +1193,14 @@ kif_do_scan(struct kif_proto *p UNUSED)
       }
     }
 
-  nl_request_dump(AF_INET, RTM_GETADDR);
+  nl_request_dump(AF_INET, RTM_GETADDR, NL_PID_KERNEL);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWADDR || h->nlmsg_type == RTM_DELADDR)
       nl_parse_addr(h, 1);
     else
       log(L_DEBUG "nl_scan_ifaces: Unknown packet received (type=%d)", h->nlmsg_type);
 
-  nl_request_dump(AF_INET6, RTM_GETADDR);
+  nl_request_dump(AF_INET6, RTM_GETADDR, NL_PID_KERNEL);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWADDR || h->nlmsg_type == RTM_DELADDR)
       nl_parse_addr(h, 1);
@@ -1381,7 +1408,7 @@ dest:
     }
 
   /* Ignore missing for DELETE */
-  return nl_exchange(&r->h, (op == NL_OP_DELETE));
+  return nl_exchange(&r->h, (op == NL_OP_DELETE), NL_PID_KERNEL);
 }
 
 static inline int
@@ -1889,7 +1916,7 @@ krt_do_scan(struct krt_proto *p UNUSED)	/* CONFIG_ALL_TABLES_AT_ONCE => p is NUL
   struct nl_parse_state s;
 
   nl_parse_begin(&s, 1);
-  nl_request_dump(AF_UNSPEC, RTM_GETROUTE);
+  nl_request_dump(AF_UNSPEC, RTM_GETROUTE, NL_PID_KERNEL);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWROUTE || h->nlmsg_type == RTM_DELROUTE)
       nl_parse_route(&s, h);
@@ -1971,7 +1998,6 @@ nl_async_hook(sock *sk, uint size UNUSED)
   if (sa.nl_pid)		/* It isn't from the kernel */
     {
       DBG("Non-kernel packet\n");
-      return 1;
     }
   h = (void *) nl_async_rx_buffer;
   len = x;
