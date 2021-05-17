@@ -69,6 +69,7 @@ static inline struct ifa * kif_get_primary_ip(struct iface *i UNUSED) { return N
 struct krt_params {
   u32 table_id;				/* Kernel table ID we sync with */
   u32 metric;				/* Kernel metric used for all routes */
+  u32 nl_pid;				/* Netlink port ID */
 };
 
 struct krt_state {

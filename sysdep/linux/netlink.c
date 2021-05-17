@@ -146,6 +146,8 @@ static linpool *nl_linpool;
 static struct nl_sock nl_scan = {.fd = -1};	/* Netlink socket for synchronous scan */
 static struct nl_sock nl_req  = {.fd = -1};	/* Netlink socket for requests */
 
+static u32 krt_nl_pid; /* Netlink port ID for KRT requests and scans */
+
 static void
 nl_open_sock(struct nl_sock *nl)
 {
@@ -1408,7 +1410,7 @@ dest:
     }
 
   /* Ignore missing for DELETE */
-  return nl_exchange(&r->h, (op == NL_OP_DELETE), NL_PID_KERNEL);
+  return nl_exchange(&r->h, (op == NL_OP_DELETE), krt_nl_pid);
 }
 
 static inline int
@@ -2091,6 +2093,8 @@ krt_sys_start(struct krt_proto *p)
 
   HASH_INSERT2(nl_table_map, RTH, krt_pool, p);
 
+  krt_nl_pid = KRT_CF->sys.nl_pid;
+
   nl_open();
   nl_open_async();
 
@@ -2106,7 +2110,9 @@ krt_sys_shutdown(struct krt_proto *p)
 int
 krt_sys_reconfigure(struct krt_proto *p UNUSED, struct krt_config *n, struct krt_config *o)
 {
-  return (n->sys.table_id == o->sys.table_id) && (n->sys.metric == o->sys.metric);
+  return (n->sys.table_id == o->sys.table_id) &&
+    (n->sys.metric == o->sys.metric) &&
+    (n->sys.nl_pid == o->sys.nl_pid);
 }
 
 void
@@ -2114,6 +2120,8 @@ krt_sys_init_config(struct krt_config *cf)
 {
   cf->sys.table_id = RT_TABLE_MAIN;
   cf->sys.metric = 32;
+  /* Scan and send updates to kernel by default. */
+  cf->sys.nl_pid = NL_PID_KERNEL;
 }
 
 void
@@ -2121,6 +2129,7 @@ krt_sys_copy_config(struct krt_config *d, struct krt_config *s)
 {
   d->sys.table_id = s->sys.table_id;
   d->sys.metric = s->sys.metric;
+  d->sys.nl_pid = s->sys.nl_pid;
 }
 
 static const char *krt_metrics_names[KRT_METRICS_MAX] = {
