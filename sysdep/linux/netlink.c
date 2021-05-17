@@ -146,6 +146,7 @@ static struct nl_sock nl_scan = {.fd = -1};	/* Netlink socket for synchronous sc
 static struct nl_sock nl_req  = {.fd = -1};	/* Netlink socket for requests */
 
 static u32 krt_nl_pid; /* Netlink port ID for KRT requests and scans */
+static u32 kif_nl_pid; /* Netlink port ID for KIF requests and scans */
 
 static void
 nl_open_sock(struct nl_sock *nl)
@@ -1167,7 +1168,7 @@ kif_do_scan(struct kif_proto *p UNUSED)
 
   if_start_update();
 
-  nl_request_dump(AF_UNSPEC, RTM_GETLINK, NL_PID_KERNEL);
+  nl_request_dump(AF_UNSPEC, RTM_GETLINK, kif_nl_pid);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWLINK || h->nlmsg_type == RTM_DELLINK)
       nl_parse_link(h, 1);
@@ -1194,14 +1195,14 @@ kif_do_scan(struct kif_proto *p UNUSED)
       }
     }
 
-  nl_request_dump(AF_INET, RTM_GETADDR, NL_PID_KERNEL);
+  nl_request_dump(AF_INET, RTM_GETADDR, kif_nl_pid);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWADDR || h->nlmsg_type == RTM_DELADDR)
       nl_parse_addr(h, 1);
     else
       log(L_DEBUG "nl_scan_ifaces: Unknown packet received (type=%d)", h->nlmsg_type);
 
-  nl_request_dump(AF_INET6, RTM_GETADDR, NL_PID_KERNEL);
+  nl_request_dump(AF_INET6, RTM_GETADDR, kif_nl_pid);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWADDR || h->nlmsg_type == RTM_DELADDR)
       nl_parse_addr(h, 1);
@@ -2184,6 +2185,8 @@ krt_sys_get_attr(const eattr *a, byte *buf, int buflen UNUSED)
 void
 kif_sys_start(struct kif_proto *p UNUSED)
 {
+  kif_nl_pid = KIF_CF->sys.nl_pid;
+
   nl_open();
   nl_open_async();
 }
@@ -2197,4 +2200,24 @@ int
 kif_update_sysdep_addr(struct iface *i UNUSED)
 {
   return 0;
+}
+
+int
+kif_sys_reconfigure(struct kif_proto *p UNUSED,
+	struct kif_config *n, struct kif_config *o)
+{
+  return (n->sys.nl_pid == o->sys.nl_pid);
+}
+
+void
+kif_sys_init_config(struct kif_config *cf)
+{
+  /* Scan the kernel by default. */
+  cf->sys.nl_pid = NL_PID_KERNEL;
+}
+
+void
+kif_sys_copy_config(struct kif_config *d, struct kif_config *s)
+{
+  d->sys.nl_pid = s->sys.nl_pid;
 }
