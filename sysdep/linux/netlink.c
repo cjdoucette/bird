@@ -1919,7 +1919,7 @@ krt_do_scan(struct krt_proto *p UNUSED)	/* CONFIG_ALL_TABLES_AT_ONCE => p is NUL
   struct nl_parse_state s;
 
   nl_parse_begin(&s, 1);
-  nl_request_dump(AF_UNSPEC, RTM_GETROUTE, NL_PID_KERNEL);
+  nl_request_dump(AF_UNSPEC, RTM_GETROUTE, krt_nl_pid);
   while (h = nl_get_scan())
     if (h->nlmsg_type == RTM_NEWROUTE || h->nlmsg_type == RTM_DELROUTE)
       nl_parse_route(&s, h);
